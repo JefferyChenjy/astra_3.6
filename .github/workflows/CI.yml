@@ -2,21 +2,17 @@ name: CI Checks
 run-name: Running Terraform Checks by ${{ github.actor }}
 
 on:
-  pull_request:
-    branches:
-      - development
-
-# Required for GitHub OIDC token generation and checkout
-permissions:
-  id-token: write
-  contents: read
+ pull_request:
+   branches:
+     - development
 
 jobs:
   Initial-Checks:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Getting initiator name
-        run: echo "Workflow initiated by ${{ github.actor }} from branch ${{ github.ref_name }}"
+    - name: Getting initiator name
+      run: echo "Workflow initiated by ${{ github.actor }} from branch ${{ github.ref_name }}"
 
   terraform-checks:
     runs-on: ubuntu-latest
@@ -24,43 +20,32 @@ jobs:
     outputs:
       status: ${{ job.status }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v3
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.OIDC_ROLE }}
-          aws-region: us-east-1
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+    - name: Terraform fmt
+      id: fmt
+      run: terraform fmt -check
 
-      - name: Terraform Init
-        id: init
-        run: terraform init -no-color
+    - name: Terraform Validate
+      id: validate
+      run: terraform validate -no-color
 
-      - name: Terraform fmt
-        id: fmt
-        run: terraform fmt -check
+    - uses: terraform-linters/setup-tflint@v3
+      with:
+        tflint_version: latest
+    
+    - name: Show version
+      run: tflint --version
 
-      - name: Terraform Validate
-        id: validate
-        run: terraform validate -no-color
+    - name: Init TFLint
+      run: tflint --init
 
-      - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v3
-        with:
-          tflint_version: latest
-
-      - name: Show version
-        run: tflint --version
-
-      - name: Init TFLint
-        run: tflint --init
-
-      - name: Run TFLint
-        run: tflint -f compact
+    - name: Run TFLint
+      run: tflint -f compact
 
   snyk-checks:
     runs-on: ubuntu-latest
@@ -68,29 +53,34 @@ jobs:
     outputs:
       status: ${{ job.status }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v3
 
-      - name: Setup Snyk CLI
-        uses: snyk/actions/setup@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    - name: Setup Snyk CLI
+      uses: snyk/actions/setup@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      - name: Snyk Code test
-        run: snyk code test
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    - name: Snyk Code test
+      run: snyk code test
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      - name: Snyk test (open source dependencies)
-        run: snyk test
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    - name: Snyk test (open source dependencies)
+      run: snyk test
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      - name: Snyk IaC test
-        run: snyk iac test
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    - name: Snyk IaC test
+      run: snyk iac test
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
+
+  #################################################
+  # Finally, update summary for snyk-check        #
+  # Update needs statement to include snyk-checks #
+  #################################################
   summary:
     needs: [terraform-checks, snyk-checks]
     runs-on: ubuntu-latest
@@ -105,8 +95,8 @@ jobs:
 
           echo "| Job Name        | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| tf-check        | $TF_STATUS |" >> $GITHUB_STEP_SUMMARY
-          echo "| snyk-check      | $SNYK_STATUS |" >> $GITHUB_STEP_SUMMARY
+          echo "| tf-check       | $TF_STATUS |" >> $GITHUB_STEP_SUMMARY
+          echo "| snyk-check     | $SNYK_STATUS |" >> $GITHUB_STEP_SUMMARY
           echo '' >> $GITHUB_STEP_SUMMARY
 
-          echo "## Job ran by: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo '## Job ran by: ${{ github.actor }}' >> $GITHUB_STEP_SUMMARY
