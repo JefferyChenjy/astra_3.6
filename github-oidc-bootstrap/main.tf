@@ -62,6 +62,7 @@ resource "aws_iam_role_policy" "oidc_iam_policy" {
           "iam:UntagRole",
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies",
+          "iam:ListInstanceProfilesForRole",
           "iam:PassRole",
           "iam:CreatePolicy",
           "iam:GetPolicy",
